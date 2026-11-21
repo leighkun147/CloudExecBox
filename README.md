@@ -159,8 +159,8 @@ cloudexecbox/
 
 ~~~bash
 # 1. Clone the repository
-git clone https://github.com/<your-username>/cloudexecbox.git
-cd cloudexecbox
+git clone https://github.com/leighkun147/CloudExecBox.git
+cd CloudExecBox
 
 # 2. Install Node.js dependencies
 npm install

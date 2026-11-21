@@ -1,0 +1,14 @@
+FROM python:3.12-alpine
+
+# Create a non-privileged working directory owned by nobody (65534)
+WORKDIR /code
+RUN chown 65534:65534 /code
+
+# Switch to non-root user by default
+USER 65534:65534
+
+# Prevent Python from writing .pyc bytecode files or buffering stdout
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+CMD ["python3"]

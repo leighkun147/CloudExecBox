@@ -1,5 +1,5 @@
 import { runSubmission } from "./excution_worker.js";
-
+//a layer between the simulator testrunner and the actual excution worker.
 function resolveCaseWeights(testCases) {
   const hasExplicitPoints = testCases.some(
     (tc) => typeof tc.points === "number" && Number.isFinite(tc.points)

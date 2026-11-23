@@ -1,133 +1,156 @@
-import { runSubmission } from "./excution_worker.js";
+import { gradeSubmission } from "./grader.js";
 
-const CASES = [
+const ALGORITHM_TEST_CASES = [
   {
-    name: "AC (C sum)",
-    job: {
+    name: "Small positive numbers",
+    points: 20,
+    stdin: "5\n3 9 1 7 4\n",
+    expectedOutput: "9",
+    timeoutMs: 3000,
+  },
+  {
+    name: "Single element",
+    points: 20,
+    stdin: "1\n42\n",
+    expectedOutput: "42",
+    timeoutMs: 3000,
+  },
+  {
+    name: "All negative numbers",
+    points: 20,
+    stdin: "4\n-15 -3 -99 -1\n",
+    expectedOutput: "-1",
+    timeoutMs: 3000,
+  },
+  {
+    name: "Zeros and duplicates",
+    points: 20,
+    stdin: "6\n0 0 8 8 2 0\n",
+    expectedOutput: "8",
+    timeoutMs: 3000,
+  },
+  {
+    name: "Large values near 32-bit int",
+    points: 20,
+    stdin: "3\n1000000000 2000000000 1500000000\n",
+    expectedOutput: "2000000000",
+    timeoutMs: 3000,
+  },
+];
+
+const SUBMISSIONS = [
+  {
+    label: "Optimal C solution (expected AC, 100/100)",
+    expectedVerdict: "AC",
+    expectedScore: 100,
+    submission: {
       language: "c",
       sourceCode: String.raw`
 #include <stdio.h>
 
 int main(void) {
-    int a, b;
-    if (scanf("%d %d", &a, &b) != 2) return 1;
-    printf("%d\n", a + b);
-    return 0;
-}
-`,
-      stdin: "7 5\n",
-      expectedOutput: "12",
-      timeoutMs: 3000,
-    },
-  },
-  {
-    name: "WA (Python wrong sum)",
-    job: {
-      language: "python",
-      sourceCode: String.raw`
-a, b = map(int, input().split())
-print(a * b)
-`,
-      stdin: "7 5\n",
-      expectedOutput: "12",
-      timeoutMs: 3000,
-    },
-  },
-  {
-    name: "CE (C syntax error)",
-    job: {
-      language: "c",
-      sourceCode: String.raw`
-#include <stdio.h>
+    int n;
+    if (scanf("%d", &n) != 1 || n <= 0) return 1;
 
-int main(void) {
-    printf("missing semicolon")
-    return 0;
-}
-`,
-      stdin: "",
-      expectedOutput: "missing semicolon",
-      timeoutMs: 3000,
-    },
-  },
-  {
-    name: "TLE (Python infinite loop)",
-    job: {
-      language: "python",
-      sourceCode: String.raw`
-print("looping", flush=True)
-while True:
-    pass
-`,
-      stdin: "",
-      expectedOutput: "looping",
-      timeoutMs: 2000,
-    },
-  },
-  {
-    name: "MLE (C 256MB over 128m cap)",
-    job: {
-      language: "c",
-      sourceCode: String.raw`
-#include <stdio.h>
-#include <stdlib.h>
+    long long best;
+    if (scanf("%lld", &best) != 1) return 1;
 
-int main(void) {
-    size_t bytes = 256ULL * 1024ULL * 1024ULL;
-    volatile unsigned char *p = malloc(bytes);
-    if (!p) {
-        fprintf(stderr, "malloc returned NULL\n");
-        return 1;
+    for (int i = 1; i < n; i++) {
+        long long x;
+        if (scanf("%lld", &x) != 1) return 1;
+        if (x > best) best = x;
     }
-    volatile unsigned long long sum = 0;
-    for (size_t i = 0; i < bytes; i += 4096) {
-        p[i] = (unsigned char)(i & 0xff);
-        sum += p[i];
-    }
-    printf("%llu\n", sum);
+
+    printf("%lld\n", best);
     return 0;
 }
 `,
-      stdin: "",
-      expectedOutput: "",
-      timeoutMs: 4000,
+      testCases: ALGORITHM_TEST_CASES,
     },
   },
   {
-    name: "RE (Python division by zero)",
-    job: {
+    label: "Buggy Python solution initialized to 0 (expected WA, 80/100)",
+    expectedVerdict: "WA",
+    expectedScore: 80,
+    submission: {
       language: "python",
       sourceCode: String.raw`
-x = 1 / 0
-print(x)
+n = int(input().strip())
+nums = list(map(int, input().split()))
+best = 0
+for x in nums:
+    if x > best:
+        best = x
+print(best)
 `,
-      stdin: "",
-      expectedOutput: "",
-      timeoutMs: 3000,
+      testCases: ALGORITHM_TEST_CASES,
+    },
+  },
+  {
+    label: "Syntax error C solution (expected CE, 0/100)",
+    expectedVerdict: "CE",
+    expectedScore: 0,
+    submission: {
+      language: "c",
+      sourceCode: String.raw`
+#include <stdio.h>
+
+int main(void) {
+    printf("broken")
+    return 0;
+}
+`,
+      testCases: ALGORITHM_TEST_CASES,
+    },
+  },
+  {
+    label: "Crashing Python solution on input (expected RE, 0/100)",
+    expectedVerdict: "RE",
+    expectedScore: 0,
+    submission: {
+      language: "python",
+      sourceCode: String.raw`
+n = int(input().strip())
+raise RuntimeError("simulated runtime failure")
+`,
+      testCases: ALGORITHM_TEST_CASES,
     },
   },
 ];
 
 async function main() {
-  let passed = 0;
+  let passedSuites = 0;
 
-  for (const { name, job } of CASES) {
-    const expectedVerdict = name.split(" ")[0];
-    const res = await runSubmission(job);
-    const ok = res.verdict === expectedVerdict;
-    if (ok) passed++;
+  for (const item of SUBMISSIONS) {
+    const report = await gradeSubmission(item.submission);
+    const ok =
+      report.verdict === item.expectedVerdict &&
+      report.score === item.expectedScore;
+
+    if (ok) passedSuites++;
 
     console.log(
-      `[${ok ? "PASS" : "FAIL"}] ${name} -> verdict=${res.verdict} (expected ${expectedVerdict}), code=${res.exitCode}, oom=${Boolean(res.oomKilled)}, truncOut=${Boolean(res.stdoutTruncated)}, time=${res.elapsedMs}ms`
+      `[${ok ? "PASS" : "FAIL"}] ${item.label} -> verdict=${report.verdict}, score=${report.score}/${report.maxScore}, passed=${report.passedCount}/${report.totalCases}, time=${report.elapsedMs}ms`
     );
+
+    for (const c of report.cases) {
+      console.log(
+        `   - Case ${c.index + 1} (${c.name}): ${c.verdict} (${c.pointsEarned}/${c.maxPoints} pts, ${c.elapsedMs}ms)`
+      );
+    }
+
     if (!ok) {
-      console.log("  stdout:", JSON.stringify(res.stdout));
-      console.log("  stderr:", JSON.stringify(res.stderr));
+      console.log(
+        `   Expected verdict=${item.expectedVerdict}, score=${item.expectedScore}`
+      );
+      if (report.compileStderr) {
+        console.log("   compileStderr:", JSON.stringify(report.compileStderr));
+      }
     }
   }
 
-  console.log(`\nSummary: ${passed}/${CASES.length} passed`);
-  if (passed !== CASES.length) {
+  console.log(`\nSuites passed: ${passedSuites}/${SUBMISSIONS.length}`);
+  if (passedSuites !== SUBMISSIONS.length) {
     process.exitCode = 1;
   }
 }

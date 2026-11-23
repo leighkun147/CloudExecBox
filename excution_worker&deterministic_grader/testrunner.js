@@ -38,6 +38,12 @@ const ALGORITHM_TEST_CASES = [
   },
 ];
 
+// Fast 1s timeout on each case so TLE finishes quickly during test runs
+const FAST_TLE_TEST_CASES = ALGORITHM_TEST_CASES.map((tc) => ({
+  ...tc,
+  timeoutMs: 1000,
+}));
+
 const SUBMISSIONS = [
   {
     label: "Optimal C solution (expected AC, 100/100)",
@@ -116,6 +122,54 @@ raise RuntimeError("simulated runtime failure")
       testCases: ALGORITHM_TEST_CASES,
     },
   },
+  {
+    label: "Infinite loop Python solution (expected TLE, 0/100)",
+    expectedVerdict: "TLE",
+    expectedScore: 0,
+    submission: {
+      language: "python",
+      sourceCode: String.raw`
+n = int(input().strip())
+while True:
+    pass
+`,
+      testCases: FAST_TLE_TEST_CASES,
+    },
+  },
+  {
+    label: "256MB C allocator over 128m cap (expected MLE, 0/100)",
+    expectedVerdict: "MLE",
+    expectedScore: 0,
+    submission: {
+      language: "c",
+      sourceCode: String.raw`
+#include <stdio.h>
+#include <stdlib.h>
+
+int main(void) {
+    int n;
+    if (scanf("%d", &n) != 1) return 1;
+
+    size_t bytes = 256ULL * 1024ULL * 1024ULL;
+    volatile unsigned char *p = malloc(bytes);
+    if (!p) {
+        fprintf(stderr, "malloc returned NULL\n");
+        return 1;
+    }
+
+    volatile unsigned long long sum = 0;
+    for (size_t i = 0; i < bytes; i += 4096) {
+        p[i] = (unsigned char)(i & 0xff);
+        sum += p[i];
+    }
+
+    printf("%llu\n", sum);
+    return 0;
+}
+`,
+      testCases: ALGORITHM_TEST_CASES,
+    },
+  },
 ];
 
 async function main() {
@@ -135,7 +189,7 @@ async function main() {
 
     for (const c of report.cases) {
       console.log(
-        `   - Case ${c.index + 1} (${c.name}): ${c.verdict} (${c.pointsEarned}/${c.maxPoints} pts, ${c.elapsedMs}ms)`
+        `   - Case ${c.index + 1} (${c.name}): ${c.verdict} (oom=${Boolean(c.oomKilled)}, ${c.pointsEarned}/${c.maxPoints} pts, ${c.elapsedMs}ms)`
       );
     }
 
